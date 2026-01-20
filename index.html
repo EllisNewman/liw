@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Life in Weeks – PoC</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #0b0c10;
+        --bg-elevated: #151822;
+        --fg: #f5f5f7;
+        --muted: #8b8fa3;
+        --accent: #4f8df5;
+        --past: #4f8df5;
+        --current: #f5b64f;
+        --future: #2a3140;
+        --border-subtle: #212633;
+        --radius-lg: 16px;
+        --radius-sm: 4px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+          "Segoe UI", sans-serif;
+        background: radial-gradient(circle at top, #15192a 0, #05060a 60%);
+        color: var(--fg);
+        display: flex;
+        align-items: stretch;
+        justify-content: center;
+        padding: 24px;
+      }
+
+      .shell {
+        width: 100%;
+        max-width: 1120px;
+        background: linear-gradient(145deg, #0b0c12 0, #050608 60%, #0f1019 100%);
+        border-radius: 24px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        box-shadow:
+          0 18px 60px rgba(0, 0, 0, 0.75),
+          0 0 0 1px rgba(255, 255, 255, 0.02);
+        padding: 20px 22px 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .title-block {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .badge {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 2px 8px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.02);
+        color: var(--muted);
+      }
+
+      .subtitle {
+        margin: 0;
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      form {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: flex-end;
+      }
+
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 140px;
+      }
+
+      label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--muted);
+      }
+
+      input[type="date"],
+      input[type="number"] {
+        appearance: none;
+        padding: 7px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--border-subtle);
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--fg);
+        font-size: 13px;
+        outline: none;
+        min-height: 32px;
+      }
+
+      input[type="date"]:focus,
+      input[type="number"]:focus {
+        border-color: rgba(79, 141, 245, 0.8);
+        box-shadow: 0 0 0 1px rgba(79, 141, 245, 0.6);
+      }
+
+      button {
+        border: none;
+        cursor: pointer;
+        border-radius: 999px;
+        padding: 8px 18px;
+        font-size: 13px;
+        font-weight: 500;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        background: radial-gradient(circle at top left, #5f8fff 0, #3555ff 50%, #1e2a80 100%);
+        color: white;
+        box-shadow:
+          0 10px 30px rgba(39, 88, 255, 0.55),
+          0 0 0 1px rgba(255, 255, 255, 0.06);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      button span.dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.9);
+      }
+
+      button:active {
+        transform: translateY(1px);
+        box-shadow:
+          0 4px 20px rgba(39, 88, 255, 0.55),
+          0 0 0 1px rgba(255, 255, 255, 0.06);
+      }
+
+      main {
+        display: grid;
+        grid-template-columns: minmax(0, 2.3fr) minmax(0, 1fr);
+        gap: 18px;
+        align-items: stretch;
+      }
+
+      @media (max-width: 800px) {
+        body {
+          padding: 12px;
+        }
+
+        .shell {
+          padding: 16px 14px 18px;
+        }
+
+        main {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+
+      .panel {
+        border-radius: var(--radius-lg);
+        background: radial-gradient(circle at top, #181b26 0, #080910 52%);
+        border: 1px solid rgba(255, 255, 255, 0.04);
+        padding: 14px 14px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        min-height: 260px;
+      }
+
+      .panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .grid-wrapper {
+        position: relative;
+        flex: 1;
+        overflow: hidden;
+        border-radius: 12px;
+        background: radial-gradient(circle at top left, #171b28 0, #05060b 60%);
+        border: 1px solid rgba(255, 255, 255, 0.03);
+      }
+
+      .weeks-grid {
+        --cols: 52;
+        display: grid;
+        grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+        gap: 1px;
+        padding: 10px;
+        width: 100%;
+        height: 100%;
+      }
+
+      .week-cell {
+        aspect-ratio: 1;
+        border-radius: 2px;
+        background: var(--future);
+        transition:
+          background 160ms ease-out,
+          transform 120ms ease-out,
+          box-shadow 160ms ease-out;
+        position: relative;
+      }
+
+      .week-cell.past {
+        background: radial-gradient(circle at top, #4f8df5 0, #3558c8 60%);
+      }
+
+      .week-cell.current {
+        background: radial-gradient(circle at top left, #ffc15a 0, #f39c3c 60%);
+        box-shadow: 0 0 0 1px rgba(255, 188, 79, 0.8);
+      }
+
+      .week-cell:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+      }
+
+      .week-cell::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        border: 1px solid rgba(0, 0, 0, 0.22);
+        mix-blend-mode: multiply;
+        pointer-events: none;
+      }
+
+      .grid-empty {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--muted);
+        font-size: 13px;
+        padding: 24px 16px;
+      }
+
+      .stats {
+        font-size: 13px;
+        color: var(--muted);
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .stats strong {
+        color: var(--fg);
+        font-weight: 500;
+      }
+
+      .callout {
+        margin-top: 8px;
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.5;
+      }
+
+      .callout strong {
+        color: var(--fg);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <header>
+        <div class="title-block">
+          <h1>
+            Life in Weeks
+            <span class="badge">by Excelsior</span>
+          </h1>
+          <p class="subtitle">
+            一格代表一周。输入出生日期和预期周数，查看当前周历。
+          </p>
+        </div>
+      </header>
+
+      <form id="config-form">
+        <div class="field">
+          <label for="birth">出生日期</label>
+          <input id="birth" name="birth" type="date" required />
+        </div>
+        <div class="field">
+          <label for="totalWeeks">总周数</label>
+          <input
+            id="totalWeeks"
+            name="totalWeeks"
+            type="number"
+            min="52"
+            max="8000"
+            step="1"
+            value="4680"
+          />
+        </div>
+        <div class="field">
+          <label for="ageYears">年龄</label>
+          <input
+            id="ageYears"
+            name="ageYears"
+            type="number"
+            min="1"
+            max="120"
+            step="1"
+            inputmode="numeric"
+          />
+        </div>
+        <div class="field">
+          <label for="colsPerRow">列数</label>
+          <input
+            id="colsPerRow"
+            name="colsPerRow"
+            type="number"
+            min="10"
+            max="120"
+            step="1"
+            value="52"
+          />
+        </div>
+        <button type="submit">
+          <span class="dot"></span>
+          生成生命周历
+        </button>
+      </form>
+
+      <main>
+        <section class="panel">
+          <div class="panel-header">
+            <span>生命周格</span>
+          </div>
+          <div class="grid-wrapper">
+            <div id="grid" class="grid-empty">
+              还没有数据。填写上方信息并点击「生成生命周历」。
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <span>概要</span>
+          </div>
+          <div id="stats" class="stats">
+            <span>等待输入出生日期以计算人生周历。</span>
+          </div>
+          <div class="callout">
+            这个 PoC 版本只包含本地计算与静态渲染：
+            <strong>没有网络请求，也不做任何持久化存储</strong>。
+            目标是先验证「一周一格」的基础视觉效果和交互感觉。
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      const form = document.getElementById("config-form");
+      const gridContainer = document.getElementById("grid");
+      const statsContainer = document.getElementById("stats");
+      const totalWeeksInputEl = document.getElementById("totalWeeks");
+      const ageYearsInputEl = document.getElementById("ageYears");
+
+      function diffInWeeks(start, end) {
+        const ms = end.getTime() - start.getTime();
+        const days = ms / (1000 * 60 * 60 * 24);
+        return Math.floor(days / 7);
+      }
+
+      function syncAgeFromWeeks() {
+        const weeks = Number(totalWeeksInputEl.value);
+        if (!Number.isFinite(weeks) || weeks <= 0) {
+          ageYearsInputEl.value = "";
+          return;
+        }
+        const years = weeks / 52;
+        ageYearsInputEl.value = Math.round(years);
+      }
+
+      function syncWeeksFromAge() {
+        const years = Number(ageYearsInputEl.value);
+        if (!Number.isFinite(years) || years <= 0) {
+          return;
+        }
+        const weeks = Math.round(years * 52);
+        totalWeeksInputEl.value = String(weeks);
+      }
+
+      function renderGrid(birthDate, totalWeeks, colsPerRow) {
+        const now = new Date();
+        const birth = new Date(birthDate.getFullYear(), birthDate.getMonth(), birthDate.getDate());
+        const currentWeekIndex = Math.max(0, diffInWeeks(birth, now));
+        const cappedTotal = Math.max(currentWeekIndex + 1, totalWeeks);
+
+        const fragment = document.createDocumentFragment();
+        const grid = document.createElement("div");
+        grid.className = "weeks-grid";
+        grid.style.setProperty("--cols", colsPerRow);
+
+        for (let i = 0; i < cappedTotal; i++) {
+          const cell = document.createElement("div");
+          cell.classList.add("week-cell");
+          if (i < currentWeekIndex) {
+            cell.classList.add("past");
+          } else if (i === currentWeekIndex) {
+            cell.classList.add("current");
+          }
+          grid.appendChild(cell);
+        }
+
+        fragment.appendChild(grid);
+
+        gridContainer.innerHTML = "";
+        gridContainer.className = "";
+        gridContainer.appendChild(fragment);
+
+        const passed = Math.min(currentWeekIndex, cappedTotal);
+        const remaining = Math.max(0, cappedTotal - passed - 1);
+        const percent =
+          cappedTotal > 0 ? Math.min(100, ((passed + 1) / cappedTotal) * 100) : 0;
+
+        statsContainer.innerHTML = "";
+        const lines = [
+          `这是第 <strong> ${passed + 1} </strong>周`,
+          `预计未来 <strong>${remaining}</strong> 周。`,
+          `进度约为 <strong>${percent.toFixed(1)}%</strong>。`
+        ];
+        lines.forEach((text) => {
+          const p = document.createElement("p");
+          p.innerHTML = text;
+          statsContainer.appendChild(p);
+        });
+      }
+
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const birthValue = form.birth.value;
+        if (!birthValue) return;
+
+        const colsInput = Number(form.colsPerRow.value);
+        const colsPerRow =
+          Number.isFinite(colsInput) && colsInput > 0
+            ? Math.max(1, Math.floor(colsInput))
+            : 52;
+
+        const totalWeeksInput = Number(form.totalWeeks.value);
+        const totalWeeks =
+          Number.isFinite(totalWeeksInput) && totalWeeksInput > 0
+            ? Math.floor(totalWeeksInput)
+            : 4680;
+
+        const birthDate = new Date(birthValue);
+        if (Number.isNaN(birthDate.getTime())) return;
+
+        renderGrid(birthDate, totalWeeks, colsPerRow);
+      });
+
+      totalWeeksInputEl.addEventListener("input", syncAgeFromWeeks);
+      ageYearsInputEl.addEventListener("input", syncWeeksFromAge);
+
+      // 初始化一次年龄显示
+      syncAgeFromWeeks();
+    </script>
+  </body>
+</html>
+
