@@ -217,23 +217,25 @@
 
       .weeks-grid {
         --cols: 52;
+        --gap: 1px;
+        --cell-size: 10px;
         display: grid;
-        grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
-        gap: 1px;
+        grid-template-columns: repeat(var(--cols), var(--cell-size));
+        grid-auto-rows: var(--cell-size);
+        gap: var(--gap);
         padding: 10px;
-        width: 100%;
-        height: 100%;
+        align-content: start;
+        justify-content: start;
       }
 
       .week-cell {
-        aspect-ratio: 1;
         border-radius: 2px;
         background: var(--future);
         transition:
           background 160ms ease-out,
-          transform 120ms ease-out,
           box-shadow 160ms ease-out;
-        position: relative;
+        width: 100%;
+        height: 100%;
       }
 
       .week-cell.past {
@@ -243,21 +245,6 @@
       .week-cell.current {
         background: radial-gradient(circle at top left, #ffc15a 0, #f39c3c 60%);
         box-shadow: 0 0 0 1px rgba(255, 188, 79, 0.8);
-      }
-
-      .week-cell:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
-      }
-
-      .week-cell::after {
-        content: "";
-        position: absolute;
-        inset: 0;
-        border-radius: inherit;
-        border: 1px solid rgba(0, 0, 0, 0.22);
-        mix-blend-mode: multiply;
-        pointer-events: none;
       }
 
       .grid-empty {
@@ -389,6 +376,13 @@
       const statsContainer = document.getElementById("stats");
       const totalWeeksInputEl = document.getElementById("totalWeeks");
       const ageYearsInputEl = document.getElementById("ageYears");
+      const colsPerRowInputEl = document.getElementById("colsPerRow");
+
+      const GRID_GAP = 1; // px，对应 .weeks-grid --gap
+      const GRID_PADDING_X = 20; // px，对应 padding-left + padding-right (10px * 2)
+      const MIN_CELL_SIZE = 6; // px，防止列数过高导致为负数
+
+      let lastRender = null;
 
       function diffInWeeks(start, end) {
         const ms = end.getTime() - start.getTime();
@@ -415,6 +409,14 @@
         totalWeeksInputEl.value = String(weeks);
       }
 
+      function computeCellSize(colsPerRow) {
+        const wrapper = gridContainer.closest(".grid-wrapper");
+        const wrapperWidth = wrapper ? wrapper.clientWidth : gridContainer.clientWidth;
+        const innerWidth = Math.max(0, wrapperWidth - GRID_PADDING_X);
+        const size = Math.floor((innerWidth - (colsPerRow - 1) * GRID_GAP) / colsPerRow);
+        return Math.max(MIN_CELL_SIZE, size);
+      }
+
       function renderGrid(birthDate, totalWeeks, colsPerRow) {
         const now = new Date();
         const birth = new Date(birthDate.getFullYear(), birthDate.getMonth(), birthDate.getDate());
@@ -425,6 +427,8 @@
         const grid = document.createElement("div");
         grid.className = "weeks-grid";
         grid.style.setProperty("--cols", colsPerRow);
+        grid.style.setProperty("--gap", `${GRID_GAP}px`);
+        grid.style.setProperty("--cell-size", `${computeCellSize(colsPerRow)}px`);
 
         for (let i = 0; i < cappedTotal; i++) {
           const cell = document.createElement("div");
@@ -482,6 +486,7 @@
         if (Number.isNaN(birthDate.getTime())) return;
 
         renderGrid(birthDate, totalWeeks, colsPerRow);
+        lastRender = { birthDate, totalWeeks, colsPerRow };
       });
 
       totalWeeksInputEl.addEventListener("input", syncAgeFromWeeks);
@@ -489,6 +494,17 @@
 
       // 初始化一次年龄显示
       syncAgeFromWeeks();
+
+      // 窗口尺寸变化时，重新计算单格尺寸，保持整齐度
+      let resizeTimer = null;
+      window.addEventListener("resize", () => {
+        if (!lastRender) return;
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+          const { birthDate, totalWeeks, colsPerRow } = lastRender;
+          renderGrid(birthDate, totalWeeks, colsPerRow);
+        }, 120);
+      });
     </script>
   </body>
 </html>
