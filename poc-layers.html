@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Life in Weeks – Layers & Annotations PoC</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #0b0c10;
+        --bg-elevated: #151822;
+        --fg: #f5f5f7;
+        --muted: #8b8fa3;
+        --accent: #4f8df5;
+        --past: #4f8df5;
+        --current: #f5b64f;
+        --future: #2a3140;
+        --border-subtle: #212633;
+        --radius-lg: 16px;
+        --radius-sm: 4px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+          "Segoe UI", sans-serif;
+        background: radial-gradient(circle at top, #15192a 0, #05060a 60%);
+        color: var(--fg);
+        display: flex;
+        align-items: stretch;
+        justify-content: center;
+        padding: 24px;
+      }
+
+      .shell-light {
+        width: 100%;
+        max-width: 1120px;
+        background: linear-gradient(145deg, #f5f7ff 0, #050608 60%, #b9b9bb 100%);
+        border-radius: 24px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        box-shadow:
+          0 18px 60px rgba(0, 0, 0, 0.75),
+          0 0 0 1px rgba(255, 255, 255, 0.02);
+        padding: 20px 22px 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+
+      .shell-dark {
+        width: 100%;
+        max-width: 1120px;
+        background: linear-gradient(145deg, #12100b 0, #050608 60%, #0f1019 100%);
+        border-radius: 24px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        box-shadow:
+          0 18px 60px rgba(0, 0, 0, 0.75),
+          0 0 0 1px rgba(255, 255, 255, 0.02);
+        padding: 20px 22px 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .title-block {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .badge {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 2px 8px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.02);
+        color: var(--muted);
+      }
+
+      .subtitle {
+        margin: 0;
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      form {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: flex-end;
+      }
+
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 140px;
+      }
+
+      label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--muted);
+      }
+
+      input[type="date"],
+      input[type="number"] {
+        appearance: none;
+        padding: 7px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--border-subtle);
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--fg);
+        font-size: 13px;
+        outline: none;
+        min-height: 32px;
+      }
+
+      input[type="date"]:focus,
+      input[type="number"]:focus {
+        border-color: rgba(79, 141, 245, 0.8);
+        box-shadow: 0 0 0 1px rgba(79, 141, 245, 0.6);
+      }
+
+      button {
+        border: none;
+        cursor: pointer;
+        border-radius: 999px;
+        padding: 8px 18px;
+        font-size: 13px;
+        font-weight: 500;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        background: radial-gradient(circle at top left, #5f8fff 0, #3555ff 50%, #1e2a80 100%);
+        color: white;
+        box-shadow:
+          0 10px 30px rgba(39, 88, 255, 0.55),
+          0 0 0 1px rgba(255, 255, 255, 0.06);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      button span.dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.9);
+      }
+
+      button:active {
+        transform: translateY(1px);
+        box-shadow:
+          0 4px 20px rgba(39, 88, 255, 0.55),
+          0 0 0 1px rgba(255, 255, 255, 0.06);
+      }
+
+      main {
+        display: grid;
+        grid-template-columns: minmax(0, 2.3fr) minmax(0, 1fr);
+        gap: 18px;
+        align-items: stretch;
+      }
+
+      @media (max-width: 800px) {
+        body {
+          padding: 12px;
+        }
+
+        .shell {
+          padding: 16px 14px 18px;
+        }
+
+        main {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+
+      .panel {
+        border-radius: var(--radius-lg);
+        background: radial-gradient(circle at top, #181b26 0, #080910 52%);
+        border: 1px solid rgba(255, 255, 255, 0.04);
+        padding: 14px 14px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        min-height: 260px;
+      }
+
+      .panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--muted);
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .grid-wrapper {
+        position: relative;
+        flex: 1;
+        overflow: hidden;
+        border-radius: 12px;
+        background: radial-gradient(circle at top left, #171b28 0, #05060b 60%);
+        border: 1px solid rgba(255, 255, 255, 0.03);
+      }
+
+      .weeks-grid {
+        --cols: 52;
+        --gap: 1px;
+        --cell-size: 10px;
+        display: grid;
+        grid-template-columns: repeat(var(--cols), var(--cell-size));
+        grid-auto-rows: var(--cell-size);
+        gap: var(--gap);
+        padding: 10px;
+        align-content: start;
+        justify-content: start;
+      }
+
+      .week-cell {
+        border-radius: 2px;
+        background: var(--future);
+        transition:
+          background 200ms ease-out,
+          box-shadow 200ms ease-out;
+        width: 100%;
+        height: 100%;
+        position: relative;
+      }
+
+      .week-cell.past {
+        background: radial-gradient(circle at top, #4f8df5 0, #3558c8 60%);
+      }
+
+      .week-cell.current {
+        background: radial-gradient(circle at top left, #ffc15a 0, #f39c3c 60%);
+        box-shadow: 0 0 0 1px rgba(255, 188, 79, 0.8);
+      }
+
+      .grid-empty {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--muted);
+        font-size: 13px;
+        padding: 24px 16px;
+      }
+
+      /* 层级和标注控制面板样式 */
+      .controls-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        max-height: 600px;
+        overflow-y: auto;
+      }
+
+      .control-section {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .control-section-title {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--muted);
+        font-weight: 600;
+      }
+
+      .layer-item,
+      .annotation-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 10px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        transition: all 150ms ease-out;
+      }
+
+      .layer-item:hover,
+      .annotation-item:hover {
+        background: rgba(255, 255, 255, 0.04);
+        border-color: rgba(255, 255, 255, 0.1);
+      }
+
+      .layer-item.active,
+      .annotation-item.active {
+        background: rgba(79, 141, 245, 0.1);
+        border-color: rgba(79, 141, 245, 0.3);
+      }
+
+      .layer-toggle {
+        width: 36px;
+        height: 20px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        position: relative;
+        cursor: pointer;
+        transition: all 200ms ease-out;
+        flex-shrink: 0;
+      }
+
+      .layer-toggle.active {
+        background: var(--accent);
+        border-color: var(--accent);
+      }
+
+      .layer-toggle::after {
+        content: "";
+        position: absolute;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: white;
+        top: 2px;
+        left: 2px;
+        transition: transform 200ms ease-out;
+      }
+
+      .layer-toggle.active::after {
+        transform: translateX(16px);
+      }
+
+      .annotation-checkbox {
+        width: 18px;
+        height: 18px;
+        border-radius: 4px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        background: rgba(255, 255, 255, 0.05);
+        cursor: pointer;
+        position: relative;
+        flex-shrink: 0;
+        transition: all 150ms ease-out;
+      }
+
+      .annotation-checkbox.checked {
+        background: var(--accent);
+        border-color: var(--accent);
+      }
+
+      .annotation-checkbox.checked::after {
+        content: "✓";
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: white;
+        font-size: 12px;
+        font-weight: bold;
+      }
+
+      .layer-label,
+      .annotation-label {
+        flex: 1;
+        font-size: 13px;
+        color: var(--fg);
+        cursor: pointer;
+      }
+
+      .layer-color-preview {
+        width: 20px;
+        height: 20px;
+        border-radius: 4px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        flex-shrink: 0;
+      }
+
+      .annotation-icon {
+        width: 16px;
+        height: 16px;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+
+      /* 周格上的标注图标 */
+      .week-cell .annotation-icon-overlay {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 60%;
+        height: 60%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        pointer-events: none;
+        z-index: 2;
+      }
+
+      .week-cell .annotation-icons-stack {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1px;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .week-cell .annotation-icon-small {
+        font-size: 8px;
+        line-height: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="shell shell-dark">
+        <header>
+          <div class="title-block">
+            <h1>
+              Life in Weeks
+              <span class="badge">层级与标注 PoC</span>
+            </h1>
+            <p class="subtitle">
+              一格代表一周。输入出生日期，查看当前周历。
+            </p>
+          </div>
+        </header>
+
+        <form @submit.prevent="generateGrid">
+          <div class="field">
+            <label for="birth">出生日期</label>
+            <input
+              id="birth"
+              v-model="birthDate"
+              type="date"
+              required
+            />
+          </div>
+          <div class="field">
+            <label for="totalWeeks">总周数</label>
+            <input
+              id="totalWeeks"
+              v-model.number="totalWeeks"
+              type="number"
+              min="52"
+              max="8000"
+              step="1"
+            />
+          </div>
+          <div class="field">
+            <label for="ageYears">年龄</label>
+            <input
+              id="ageYears"
+              v-model.number="ageYears"
+              type="number"
+              min="1"
+              max="120"
+              step="1"
+              inputmode="numeric"
+            />
+          </div>
+          <div class="field">
+            <label for="colsPerRow">列数</label>
+            <input
+              id="colsPerRow"
+              v-model.number="colsPerRow"
+              type="number"
+              min="10"
+              max="120"
+              step="1"
+            />
+          </div>
+          <button type="submit">
+            <span class="dot"></span>
+            生成生命周历
+          </button>
+        </form>
+
+        <main>
+          <section class="panel">
+            <div class="panel-header">
+              <span>生命周格</span>
+            </div>
+            <div class="grid-wrapper">
+              <div v-if="!hasData" class="grid-empty">
+                还没有数据。填写上方信息并点击「生成生命周历」。
+              </div>
+              <div
+                v-else
+                ref="gridEl"
+                class="weeks-grid"
+                :style="gridStyle"
+              >
+                <div
+                  v-for="(week, index) in weeks"
+                  :key="index"
+                  class="week-cell"
+                  :class="getWeekCellClasses(week, index)"
+                  :style="getWeekCellStyle(week, index)"
+                >
+                  <div
+                    v-if="getWeekAnnotations(index).length > 0"
+                    class="annotation-icon-overlay"
+                  >
+                    <div class="annotation-icons-stack">
+                      <span
+                        v-for="(icon, i) in getWeekAnnotations(index)"
+                        :key="i"
+                        class="annotation-icon-small"
+                        :title="icon.label"
+                      >
+                        {{ icon.icon }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <span>层级与标注控制</span>
+            </div>
+            <div class="controls-panel">
+              <!-- 层级系统 -->
+              <div class="control-section">
+                <div class="control-section-title">层级</div>
+                <div
+                  v-for="layer in layers"
+                  :key="layer.id"
+                  class="layer-item"
+                  :class="{ active: layer.active }"
+                >
+                  <div
+                    class="layer-toggle"
+                    :class="{ active: layer.active }"
+                    @click="toggleLayer(layer.id)"
+                  ></div>
+                  <div
+                    class="layer-color-preview"
+                    :style="{ background: layer.color }"
+                  ></div>
+                  <span class="layer-label" @click="toggleLayer(layer.id)">
+                    {{ layer.name }}
+                  </span>
+                </div>
+              </div>
+
+              <!-- 标注系统 -->
+              <div class="control-section">
+                <div class="control-section-title">标注</div>
+                <div
+                  v-for="annotation in annotations"
+                  :key="annotation.id"
+                  class="annotation-item"
+                  :class="{ active: annotation.active }"
+                >
+                  <div
+                    class="annotation-checkbox"
+                    :class="{ checked: annotation.active }"
+                    @click="toggleAnnotation(annotation.id)"
+                  ></div>
+                  <span class="annotation-icon">{{ annotation.icon }}</span>
+                  <span
+                    class="annotation-label"
+                    @click="toggleAnnotation(annotation.id)"
+                  >
+                    {{ annotation.name }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <!-- Vue 3 CDN -->
+    <!-- 
+      注意：如需完全离线运行，请下载 vue.global.prod.js 到本地并替换此链接
+      下载地址：https://unpkg.com/vue@3/dist/vue.global.prod.js
+    -->
+    <script src="./vue.global.prod.js"></script>
+    <script>
+      const { createApp, ref, computed, watch } = Vue;
+
+      createApp({
+        setup() {
+          // 基础数据
+          const birthDate = ref("1996-09-08");
+          const totalWeeks = ref(4356);
+          const ageYears = ref(84);
+          const colsPerRow = ref(66);
+          const hasData = ref(false);
+          const gridEl = ref(null);
+          const currentWeekIndex = ref(0);
+
+          // 层级系统数据（dummy data）
+          const layers = ref([
+            {
+              id: "education",
+              name: "教育阶段",
+              active: false,
+              color: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+              ranges: [
+                { start: 312, end: 624, label: "小学期间", color: "#667eea" },
+                { start: 624, end: 936, label: "中学期间", color: "#764ba2" },
+                { start: 936, end: 1196, label: "大学期间", color: "#f093fb" },
+              ],
+            },
+            {
+              id: "work",
+              name: "工作阶段",
+              active: false,
+              color: "linear-gradient(135deg, #fa709a 0%, #fee140 100%)",
+              ranges: [
+                { start: 1130, end: 1139, label: "第一份工作", color: "#fa709a" },
+                { start: 1213, end: 1390, label: "第二份工作", color: "#fee140" },
+                { start: 1391, end: 1417, label: "海外驻在", color: "#ee8f1e" },
+                { start: 1418, end: 2808, label: "第二份工作", color: "#fee140" },
+              ],
+            },
+            {
+              id: "location",
+              name: "居住地",
+              active: false,
+              color: "linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)",
+              ranges: [
+                { start: 0, end: 1872, label: "北京", color: "#a8edea" },
+                { start: 1872, end: 2808, label: "上海", color: "#fed6e3" },
+                { start: 2808, end: 4680, label: "海外", color: "#ffecd2" },
+              ],
+            },
+          ]);
+
+          // 标注系统数据（dummy data）
+          const annotations = ref([
+            {
+              id: "milestones",
+              name: "重要事件",
+              active: false,
+              icon: "⭐",
+              events: [
+                { week: 936, label: "高中毕业", icon: "🎓" },
+                { week: 1196, label: "大学毕业", icon: "🎓" },
+                { week: 1213, label: "入职", icon: "💼" },
+                { week: 2080, label: "结婚", icon: "💍" },
+                { week: 2600, label: "换工作", icon: "🔄" },
+              ],
+            },
+            {
+              id: "travel",
+              name: "旅行",
+              active: false,
+              icon: "✈️",
+              events: [
+                { week: 1200, label: "日本旅行", icon: "🗾" },
+                { week: 1500, label: "欧洲旅行", icon: "🏛️" },
+                { week: 2200, label: "东南亚旅行", icon: "🏝️" },
+                { week: 3000, label: "美国旅行", icon: "🗽" },
+              ],
+            },
+            {
+              id: "health",
+              name: "健康记录",
+              active: false,
+              icon: "🏥",
+              events: [
+                { week: 1000, label: "年度体检", icon: "🏥" },
+                { week: 2000, label: "年度体检", icon: "🏥" },
+                { week: 3000, label: "年度体检", icon: "🏥" },
+              ],
+            },
+          ]);
+
+          // 周数据
+          const weeks = computed(() => {
+            if (!hasData.value) return [];
+            const count = Math.max(currentWeekIndex.value + 1, totalWeeks.value);
+            return Array.from({ length: count }, (_, i) => ({
+              index: i,
+              isPast: i < currentWeekIndex.value,
+              isCurrent: i === currentWeekIndex.value,
+            }));
+          });
+
+          // Grid 样式
+          const gridStyle = computed(() => {
+            if (!gridEl.value) return {};
+            const wrapper = gridEl.value.closest(".grid-wrapper");
+            const wrapperWidth = wrapper ? wrapper.clientWidth : 800;
+            const innerWidth = Math.max(0, wrapperWidth - 20);
+            const gap = 1;
+            const cellSize = Math.max(
+              6,
+              Math.floor((innerWidth - (colsPerRow.value - 1) * gap) / colsPerRow.value)
+            );
+            return {
+              "--cols": colsPerRow.value,
+              "--gap": `${gap}px`,
+              "--cell-size": `${cellSize}px`,
+            };
+          });
+
+          // 计算周索引（从出生日期到现在的周数）
+          function diffInWeeks(start, end) {
+            const ms = end.getTime() - start.getTime();
+            const days = ms / (1000 * 60 * 60 * 24);
+            return Math.floor(days / 7);
+          }
+
+          // 生成网格
+          function generateGrid() {
+            if (!birthDate.value) return;
+            const birth = new Date(birthDate.value);
+            if (Number.isNaN(birth.getTime())) return;
+            const now = new Date();
+            currentWeekIndex.value = Math.max(0, diffInWeeks(birth, now));
+            hasData.value = true;
+          }
+
+          // 获取周格的 CSS 类
+          function getWeekCellClasses(week, index) {
+            const classes = [];
+            if (week.isPast) classes.push("past");
+            if (week.isCurrent) classes.push("current");
+            return classes;
+          }
+
+          // 获取周格的样式（层级颜色）
+          function getWeekCellStyle(week, index) {
+            // 查找激活的层级中是否包含这个周
+            const activeLayer = layers.value.find((layer) => layer.active);
+            if (activeLayer) {
+              const range = activeLayer.ranges.find(
+                (r) => index >= r.start && index <= r.end
+              );
+              if (range) {
+                // 如果当前周，保持高亮，但背景用层级颜色
+                if (week.isCurrent) {
+                  return {
+                    background: `radial-gradient(circle at top left, #ffc15a 0%, ${range.color} 70%)`,
+                  };
+                } else if (!week.isPast) {
+                  return {};
+                }
+                return { background: range.color };
+              }
+            }
+            return {};
+          }
+
+          // 获取该周的所有标注
+          function getWeekAnnotations(weekIndex) {
+            const result = [];
+            annotations.value.forEach((annotation) => {
+              if (annotation.active) {
+                annotation.events.forEach((event) => {
+                  if (event.week === weekIndex) {
+                    result.push({ label: event.label, icon: event.icon });
+                  }
+                });
+              }
+            });
+            return result;
+          }
+
+          // 切换层级
+          function toggleLayer(layerId) {
+            const layer = layers.value.find((l) => l.id === layerId);
+            if (layer) {
+              // 单层级激活模式：关闭其他层级
+              if (!layer.active) {
+                layers.value.forEach((l) => {
+                  l.active = l.id === layerId;
+                });
+              } else {
+                layer.active = false;
+              }
+            }
+          }
+
+          // 切换标注
+          function toggleAnnotation(annotationId) {
+            const annotation = annotations.value.find((a) => a.id === annotationId);
+            if (annotation) {
+              annotation.active = !annotation.active;
+            }
+          }
+
+          // 年龄和周数联动
+          watch(ageYears, (newVal) => {
+            if (Number.isFinite(newVal) && newVal > 0) {
+              totalWeeks.value = Math.round(newVal * 52);
+            }
+          });
+
+          watch(totalWeeks, (newVal) => {
+            if (Number.isFinite(newVal) && newVal > 0) {
+              ageYears.value = Math.round(newVal / 52);
+            }
+          });
+
+          // 窗口 resize 时重新计算
+          let resizeTimer = null;
+          window.addEventListener("resize", () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+              // 触发重新计算
+              if (hasData.value) {
+                generateGrid();
+              }
+            }, 120);
+          });
+
+          // 初始化年龄显示
+          function syncAgeFromWeeks() {
+            if (Number.isFinite(totalWeeks.value) && totalWeeks.value > 0) {
+              ageYears.value = Math.round(totalWeeks.value / 52);
+            }
+          }
+
+          syncAgeFromWeeks();
+
+          return {
+            birthDate,
+            totalWeeks,
+            ageYears,
+            colsPerRow,
+            hasData,
+            gridEl,
+            weeks,
+            gridStyle,
+            layers,
+            annotations,
+            generateGrid,
+            getWeekCellClasses,
+            getWeekCellStyle,
+            getWeekAnnotations,
+            toggleLayer,
+            toggleAnnotation,
+          };
+        },
+      }).mount("#app");
+    </script>
+  </body>
+</html>
