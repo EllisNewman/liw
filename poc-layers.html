@@ -1073,7 +1073,7 @@
       createApp({
         setup() {
           // 基础数据
-          const birthDate = ref("1996-09-08");
+          const birthDate = ref("2000-01-16");
           const totalWeeks = ref(4356);
           const ageYears = ref(84);
           const colsPerRow = ref(66);
@@ -1113,7 +1113,7 @@
                 },
                 {
                   start: 936,
-                  end: 1196,
+                  end: 1048,
                   label: "大学期间",
                   color: "#f093fb",
                   startDate: "",
@@ -1130,7 +1130,7 @@
               ranges: [
                 {
                   start: 1130,
-                  end: 1139,
+                  end: 1213,
                   label: "第一份工作",
                   color: "#fa709a",
                   startDate: "",
@@ -1155,7 +1155,7 @@
                 {
                   start: 1418,
                   end: 2808,
-                  label: "第二份工作",
+                  label: "第三份工作",
                   color: "#fee140",
                   startDate: "",
                   endDate: "",
@@ -1171,22 +1171,22 @@
               ranges: [
                 {
                   start: 0,
-                  end: 1872,
+                  end: 872,
                   label: "北京",
                   color: "#a8edea",
                   startDate: "",
                   endDate: "",
                 },
                 {
-                  start: 1872,
-                  end: 2808,
+                  start: 872,
+                  end: 1242,
                   label: "上海",
                   color: "#fed6e3",
                   startDate: "",
                   endDate: "",
                 },
                 {
-                  start: 2808,
+                  start: 1242,
                   end: 4680,
                   label: "海外",
                   color: "#ffecd2",
@@ -1367,18 +1367,20 @@
             layer.ranges = editingLayer.value.ranges.map((range) => {
               let start = dateToWeekIndex(range.startDate);
               let end = dateToWeekIndex(range.endDate);
+              let startDate = range.startDate;
+              let endDate = range.endDate;
               // 如果起始日期大于结束日期，自动交换
               if (start > end) {
                 [start, end] = [end, start];
-                [range.startDate, range.endDate] = [range.endDate, range.startDate];
+                [startDate, endDate] = [endDate, startDate];
               }
               return {
                 start,
                 end,
                 label: range.label || "未命名时间段",
                 color: range.color || layer.defaultColor,
-                startDate: range.startDate,
-                endDate: range.endDate,
+                startDate,
+                endDate,
               };
             });
 
@@ -1478,40 +1480,6 @@
             }
           }
 
-          // 监听日期变化，实时更新周索引（用于层级编辑）
-          watch(
-            () => editingLayer.value?.ranges,
-            (ranges) => {
-              if (!ranges || !birthDateObj.value) return;
-              ranges.forEach((range) => {
-                if (range.startDate && range.endDate) {
-                  range.start = dateToWeekIndex(range.startDate);
-                  range.end = dateToWeekIndex(range.endDate);
-                  // 自动交换如果顺序错误
-                  if (range.start > range.end) {
-                    [range.start, range.end] = [range.end, range.start];
-                    [range.startDate, range.endDate] = [range.endDate, range.startDate];
-                  }
-                }
-              });
-            },
-            { deep: true }
-          );
-
-          // 监听事件日期变化，实时更新周索引（用于标注编辑）
-          watch(
-            () => editingAnnotation.value?.events,
-            (events) => {
-              if (!events || !birthDateObj.value) return;
-              events.forEach((event) => {
-                if (event.date) {
-                  event.week = dateToWeekIndex(event.date);
-                }
-              });
-            },
-            { deep: true }
-          );
-
           // 获取周格的 CSS 类
           function getWeekCellClasses(week, index) {
             const classes = [];
@@ -1522,10 +1490,13 @@
 
           // 获取周格的样式（层级颜色）
           function getWeekCellStyle(week, index) {
-            // 查找激活的层级中是否包含这个周
-            const activeLayer = layers.value.find((layer) => layer.active);
-            if (activeLayer) {
-              const range = activeLayer.ranges.find(
+            // 获取所有激活的层级，按数组顺序（从下往上）
+            // 数组越靠后的层级越优先（上层覆盖下层）
+            const activeLayers = layers.value.filter((layer) => layer.active);
+            
+            // 从下往上遍历，找到第一个匹配的时间段（上层覆盖下层）
+            for (const layer of activeLayers) {
+              const range = layer.ranges.find(
                 (r) => index >= r.start && index <= r.end
               );
               if (range) {
@@ -1558,18 +1529,12 @@
             return result;
           }
 
-          // 切换层级
+          // 切换层级（支持多选，按数组顺序叠加，上层覆盖下层）
           function toggleLayer(layerId) {
             const layer = layers.value.find((l) => l.id === layerId);
             if (layer) {
-              // 单层级激活模式：关闭其他层级
-              if (!layer.active) {
-                layers.value.forEach((l) => {
-                  l.active = l.id === layerId;
-                });
-              } else {
-                layer.active = false;
-              }
+              // 多层级激活模式：简单切换当前层级状态
+              layer.active = !layer.active;
             }
           }
 
