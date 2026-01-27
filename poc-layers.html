@@ -727,6 +727,24 @@
               一格代表一周。输入出生日期，查看当前周历。
             </p>
           </div>
+          <div style="display: flex; gap: 8px; align-items: center">
+            <button type="button" class="btn-secondary" @click="handleImportClick">
+              导入
+            </button>
+            <button type="button" class="btn-secondary" @click="exportData">
+              导出
+            </button>
+            <button type="button" class="btn-danger" @click="clearData">
+              清除
+            </button>
+            <input
+              ref="importInput"
+              type="file"
+              accept="application/json"
+              style="display: none"
+              @change="handleFileChange"
+            />
+          </div>
         </header>
 
         <form @submit.prevent="generateGrid">
@@ -1072,6 +1090,9 @@
 
       createApp({
         setup() {
+          const SCHEMA_VERSION = 1;
+          const STORAGE_KEY = "lifeInWeeks.state.v1";
+
           // 基础数据
           const birthDate = ref("2000-01-16");
           const totalWeeks = ref(4356);
@@ -1081,6 +1102,7 @@
           const gridEl = ref(null);
           const currentWeekIndex = ref(0);
           const birthDateObj = ref(null);
+          const importInput = ref(null);
 
           // 编辑状态
           const editingLayer = ref(null);
@@ -1303,6 +1325,7 @@
             hasData.value = true;
             // 初始化日期字段
             initializeDates();
+            saveState();
           }
 
           // 初始化日期字段（将周索引转换为日期）
@@ -1329,6 +1352,147 @@
                 }
               });
             });
+          }
+
+          // 构建可持久化状态
+          function buildPersistedState() {
+            return {
+              meta: {
+                schemaVersion: SCHEMA_VERSION,
+              },
+              settings: {
+                birthDate: birthDate.value,
+                totalWeeks: totalWeeks.value,
+                colsPerRow: colsPerRow.value,
+              },
+              layers: layers.value.map((layer) => ({
+                id: layer.id,
+                name: layer.name,
+                defaultColor: layer.defaultColor,
+                color: layer.color,
+                ranges: layer.ranges.map((range) => ({
+                  start: range.start,
+                  end: range.end,
+                  label: range.label,
+                  color: range.color,
+                })),
+              })),
+              annotations: annotations.value.map((annotation) => ({
+                id: annotation.id,
+                name: annotation.name,
+                icon: annotation.icon,
+                events: annotation.events.map((event) => ({
+                  week: event.week,
+                  label: event.label,
+                  icon: event.icon,
+                  date: event.date,
+                })),
+              })),
+            };
+          }
+
+          function applyPersistedState(state) {
+            if (!state || !state.meta || state.meta.schemaVersion !== SCHEMA_VERSION) {
+              return;
+            }
+
+            try {
+              const settings = state.settings || {};
+              if (settings.birthDate) {
+                birthDate.value = settings.birthDate;
+              }
+              if (Number.isFinite(settings.totalWeeks)) {
+                totalWeeks.value = settings.totalWeeks;
+              }
+              if (Number.isFinite(settings.colsPerRow) && settings.colsPerRow > 0) {
+                colsPerRow.value = settings.colsPerRow;
+              }
+
+              if (Array.isArray(state.layers) && state.layers.length > 0) {
+                layers.value = state.layers.map((layer) => ({
+                  id: layer.id,
+                  name: layer.name,
+                  active: false,
+                  defaultColor: layer.defaultColor,
+                  color: layer.color || layer.defaultColor,
+                  ranges: Array.isArray(layer.ranges)
+                    ? layer.ranges.map((range) => {
+                        let start = Number(range.start) || 0;
+                        let end = Number(range.end) || 0;
+                        if (start > end) [start, end] = [end, start];
+                        return {
+                          start,
+                          end,
+                          label: range.label || "未命名时间段",
+                          color: range.color || layer.defaultColor,
+                          startDate: "",
+                          endDate: "",
+                        };
+                      })
+                    : [],
+                }));
+              }
+
+              if (Array.isArray(state.annotations) && state.annotations.length > 0) {
+                annotations.value = state.annotations.map((annotation) => ({
+                  id: annotation.id,
+                  name: annotation.name,
+                  active: false,
+                  icon: annotation.icon,
+                  events: Array.isArray(annotation.events)
+                    ? annotation.events.map((event) => {
+                        let week = typeof event.week === "number" ? event.week : 0;
+                        if (!Number.isFinite(week) && event.date) {
+                          week = dateToWeekIndex(event.date);
+                        }
+                        const safeWeek = Number.isFinite(week) && week >= 0 ? week : 0;
+                        const date =
+                          event.date ||
+                          (Number.isFinite(week) ? weekIndexToDate(safeWeek) : "");
+                        return {
+                          week: safeWeek,
+                          label: event.label || "未命名事件",
+                          icon: event.icon || annotation.icon,
+                          date,
+                        };
+                      })
+                    : [],
+                }));
+              }
+
+              if (birthDate.value) {
+                const birth = new Date(birthDate.value);
+                if (!Number.isNaN(birth.getTime())) {
+                  birthDateObj.value = birth;
+                  const now = new Date();
+                  currentWeekIndex.value = Math.max(0, diffInWeeks(birth, now));
+                  hasData.value = true;
+                  initializeDates();
+                }
+              }
+            } catch (err) {
+              console.error("Failed to apply persisted state:", err);
+            }
+          }
+
+          function saveState() {
+            try {
+              const state = buildPersistedState();
+              window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+            } catch (err) {
+              console.error("Failed to save state:", err);
+            }
+          }
+
+          function loadPersistedState() {
+            try {
+              const raw = window.localStorage.getItem(STORAGE_KEY);
+              if (!raw) return;
+              const state = JSON.parse(raw);
+              applyPersistedState(state);
+            } catch (err) {
+              console.error("Failed to load state:", err);
+            }
           }
 
           // 打开层级编辑
@@ -1385,6 +1549,7 @@
             });
 
             closeLayerEdit();
+            saveState();
           }
 
           // 添加时间段
@@ -1451,6 +1616,7 @@
             });
 
             closeAnnotationEdit();
+            saveState();
           }
 
           // 添加事件
@@ -1546,15 +1712,30 @@
             }
           }
 
-          // 年龄和周数联动
+          // 年龄和周数联动（避免相互 watch 导致的二次修改）
+          let syncingFromAge = false;
+          let syncingFromWeeks = false;
+
           watch(ageYears, (newVal) => {
+            // 如果是由 totalWeeks 同步过来的变化，则不再反向写回 totalWeeks
+            if (syncingFromWeeks) {
+              syncingFromWeeks = false;
+              return;
+            }
             if (Number.isFinite(newVal) && newVal > 0) {
+              syncingFromAge = true;
               totalWeeks.value = Math.round(newVal * 52);
             }
           });
 
           watch(totalWeeks, (newVal) => {
+            // 如果是由 ageYears 同步过来的变化，则不再反向写回 ageYears
+            if (syncingFromAge) {
+              syncingFromAge = false;
+              return;
+            }
             if (Number.isFinite(newVal) && newVal > 0) {
+              syncingFromWeeks = true;
               ageYears.value = Math.round(newVal / 52);
             }
           });
@@ -1578,10 +1759,70 @@
             }
           }
 
-          syncAgeFromWeeks();
+          loadPersistedState();
+          if (!hasData.value) {
+            syncAgeFromWeeks();
+          }
 
           // 添加键盘事件监听
           window.addEventListener("keydown", handleKeydown);
+
+          // 导入 / 导出 / 清除
+          function handleImportClick() {
+            if (importInput.value) {
+              importInput.value.click();
+            }
+          }
+
+          async function handleFileChange(event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+            try {
+              const text = await file.text();
+              const state = JSON.parse(text);
+              applyPersistedState(state);
+              saveState();
+            } catch (err) {
+              console.error("Failed to import data:", err);
+              window.alert("导入失败：文件格式不正确或已损坏。");
+            } finally {
+              event.target.value = "";
+            }
+          }
+
+          function exportData() {
+            try {
+              const state = buildPersistedState();
+              const blob = new Blob([JSON.stringify(state, null, 2)], {
+                type: "application/json",
+              });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              const dateStr = new Date().toISOString().slice(0, 10);
+              a.href = url;
+              a.download = `life-in-weeks-${dateStr}.json`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+            } catch (err) {
+              console.error("Failed to export data:", err);
+              window.alert("导出失败，请稍后重试。");
+            }
+          }
+
+          function clearData() {
+            const confirmClear = window.confirm(
+              "确定要清除本地所有数据吗？此操作不可撤销。"
+            );
+            if (!confirmClear) return;
+            try {
+              window.localStorage.removeItem(STORAGE_KEY);
+            } catch (err) {
+              console.error("Failed to clear local data:", err);
+            }
+            window.location.reload();
+          }
 
           return {
             birthDate,
@@ -1594,6 +1835,7 @@
             gridStyle,
             layers,
             annotations,
+            importInput,
             editingLayer,
             editingAnnotation,
             generateGrid,
@@ -1612,6 +1854,10 @@
             saveAnnotationEdit,
             addEvent,
             removeEvent,
+            handleImportClick,
+            handleFileChange,
+            exportData,
+            clearData,
           };
         },
       }).mount("#app");
